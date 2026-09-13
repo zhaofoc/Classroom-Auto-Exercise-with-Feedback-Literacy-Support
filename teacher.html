@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Quiz Pipeline — Teacher Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Noto+Serif+SC:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ink:       #0d0f14;
+  --paper:     #f4f1eb;
+  --rule:      #d4cfc4;
+  --rule2:     #bfb9ad;
+  --accent:    #c0392b;
+  --accent2:   #2c3e7a;
+  --green:     #1a7a4a;
+  --amber:     #b8681a;
+  --text:      #1a1c22;
+  --muted:     #7a7570;
+  --mono:      'IBM Plex Mono', monospace;
+  --serif:     'Noto Serif SC', serif;
+}
+
+body {
+  background: var(--paper);
+  color: var(--text);
+  font-family: var(--serif);
+  min-height: 100vh;
+  font-size: 14px;
+}
+
+/* ── Layout ── */
+.app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+.masthead {
+  background: var(--ink);
+  color: var(--paper);
+  padding: 0 28px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+  border-bottom: 3px solid var(--accent);
+}
+.masthead-title {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--paper);
+}
+.masthead-sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: #888;
+  letter-spacing: 0.1em;
+}
+.masthead-sep { flex: 1; }
+.masthead-link {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: #aaa;
+  text-decoration: none;
+  letter-spacing: 0.08em;
+  border: 1px solid #444;
+  padding: 4px 10px;
+  border-radius: 3px;
+  transition: all 0.15s;
+}
+.masthead-link:hover { color: var(--paper); border-color: #888; }
+
+.main { display: flex; flex: 1; overflow: hidden; }
+
+/* ── Left sidebar ── */
+.sidebar {
+  width: 320px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: #eeebe3;
+}
+
+.sb-section {
+  border-bottom: 1px solid var(--rule);
+  padding: 18px 20px;
+}
+.sb-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sb-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+}
+
+/* ── API Key input ── */
+.key-input {
+  width: 100%;
+  background: white;
+  border: 1px solid var(--rule2);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+  outline: none;
+  letter-spacing: 0.03em;
+}
+.key-input:focus { border-color: var(--accent2); }
+
+/* ── Dropzone ── */
+.dropzone {
+  border: 1.5px dashed var(--rule2);
+  border-radius: 6px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+  background: white;
+}
+.dropzone:hover, .dropzone.drag { border-color: var(--accent2); background: #f0f4ff; }
+.dropzone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.dz-icon { font-size: 20px; margin-bottom: 6px; }
+.dz-text { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+.dz-text span { color: var(--accent2); }
+
+.file-list { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.file-chip {
+  display: flex; align-items: center; gap: 7px;
+  background: white; border: 1px solid var(--rule); border-radius: 4px;
+  padding: 5px 9px; font-family: var(--mono); font-size: 10px;
+}
+.chip-ext {
+  background: var(--ink); color: var(--paper);
+  border-radius: 2px; padding: 1px 5px; font-size: 9px;
+}
+.chip-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Run button ── */
+.btn-run {
+  width: 100%;
+  background: var(--ink);
+  border: none;
+  border-radius: 4px;
+  padding: 12px;
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-transform: uppercase;
+}
+.btn-run:hover:not(:disabled) { background: var(--accent2); }
+.btn-run:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── Stage indicators ── */
+.stages { display: flex; gap: 4px; padding: 0 20px 14px; }
+.stage-dot {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--rule);
+  transition: background 0.4s;
+  position: relative;
+}
+.stage-dot.active { background: var(--amber); animation: pulse-bar 1.2s ease-in-out infinite; }
+.stage-dot.done   { background: var(--green); }
+@keyframes pulse-bar { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+.stage-labels { display: flex; gap: 4px; padding: 0 20px 16px; }
+.stage-label {
+  flex: 1; text-align: center;
+  font-family: var(--mono); font-size: 9px; color: var(--muted);
+  letter-spacing: 0.06em;
+}
+.stage-label.active { color: var(--amber); font-weight: 600; }
+.stage-label.done   { color: var(--green); }
+
+/* ── Log ── */
+.log-wrap { flex: 1; padding: 16px 20px; display: flex; flex-direction: column; min-height: 0; }
+.log-box {
+  flex: 1;
+  background: var(--ink);
+  border-radius: 6px;
+  padding: 12px;
+  overflow-y: auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.9;
+  min-height: 120px;
+}
+.log-line { display: flex; gap: 8px; }
+.log-ts { color: #555; flex-shrink: 0; }
+.log-msg.info { color: #aab0c0; }
+.log-msg.ok   { color: #4ec98d; }
+.log-msg.warn { color: #f0a846; }
+.log-msg.err  { color: #e05555; }
+
+/* ── Right panel ── */
+.right { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.panel-header {
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+  flex-shrink: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+.panel-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+}
+.status-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--rule2);
+  color: var(--muted);
+  transition: all 0.3s;
+}
+.status-badge.running { border-color: var(--amber); color: var(--amber); background: #fff8ee; }
+.status-badge.waiting { border-color: var(--accent2); color: var(--accent2); background: #f0f4ff; }
+.status-badge.done    { border-color: var(--green); color: var(--green); background: #eefff5; }
+.status-badge.error   { border-color: var(--accent); color: var(--accent); background: #fff0ee; }
+
+.panel-body { flex: 1; overflow-y: auto; padding: 24px 28px; }
+
+/* ── Status cards ── */
+.status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
+.stat-card {
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 16px 18px;
+}
+.stat-card-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.stat-card-value {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+}
+.stat-card-value.green { color: var(--green); }
+.stat-card-value.amber { color: var(--amber); }
+.stat-card-value.accent { color: var(--accent); }
+
+/* ── Section headers ── */
+.section-hd {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+  margin-top: 28px;
+}
+.section-hd:first-child { margin-top: 0; }
+
+/* ── Question preview ── */
+.q-card {
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+.q-meta {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.q-tag {
+  font-family: var(--mono);
+  font-size: 9px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--rule2);
+  color: var(--muted);
+}
+.q-tag.bloom { border-color: #b8b; color: #636; background: #f8f0f8; }
+.q-tag.diff  { border-color: #8bc; color: #368; background: #f0f6ff; }
+.q-num { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--accent2); }
+.q-text { font-size: 13px; line-height: 1.7; color: var(--text); margin-bottom: 10px; }
+.q-options { display: flex; flex-direction: column; gap: 4px; }
+.q-opt {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--rule);
+  color: var(--text);
+  background: #fafaf8;
+}
+.q-opt.correct {
+  border-color: var(--green);
+  background: #edfff5;
+  color: var(--green);
+  font-weight: 600;
+}
+
+/* ── Skillmap ── */
+.skill-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.skill-col { display: flex; flex-direction: column; gap: 8px; }
+.skill-col-hd {
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 4px 10px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+.skill-col-hd.strength { background: #edfff5; color: var(--green); border: 1px solid #aaddbb; }
+.skill-col-hd.weakness { background: #fff0ee; color: var(--accent); border: 1px solid #ddbbaa; }
+.skill-col-hd.verify   { background: #fff8ee; color: var(--amber); border: 1px solid #ddd0aa; }
+.skill-item {
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.skill-item-id {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.rec-list { display: flex; flex-direction: column; gap: 6px; }
+.rec-item {
+  background: white;
+  border-left: 3px solid var(--accent2);
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  border-radius: 0 4px 4px 0;
+}
+
+/* ── Empty state ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 14px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-align: center;
+}
+.empty-icon { font-size: 40px; opacity: 0.3; }
+
+/* ── Spinner ── */
+.spin {
+  width: 10px; height: 10px;
+  border: 2px solid #555; border-top-color: var(--amber);
+  border-radius: 50%;
+  animation: rot 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes rot { to { transform: rotate(360deg); } }
+
+/* ── Tabs ── */
+.tabs { display: flex; border-bottom: 1px solid var(--rule); margin-bottom: 20px; }
+.tab {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 10px 18px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 0.15s;
+}
+.tab.active { color: var(--text); border-bottom-color: var(--ink); font-weight: 600; }
+.tab:hover:not(.active) { color: var(--text); }
+
+/* ── Decision panel ── */
+.decision-row {
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+.decision-row-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.decision-round-badge {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.decision-round-badge.go   { background: #edfff5; color: var(--green); border: 1px solid #aaddbb; }
+.decision-round-badge.stop { background: #fff0ee; color: var(--accent); border: 1px solid #ddbbaa; }
+.decision-scores {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.dscore {
+  flex: 1;
+  border-radius: 4px;
+  padding: 8px 10px;
+  text-align: center;
+  font-family: var(--mono);
+}
+.dscore.benefit { background: #edfff5; border: 1px solid #aaddbb; }
+.dscore.burnout { background: #fff0ee; border: 1px solid #ddbbaa; }
+.dscore-label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 2px; }
+.dscore-val   { font-size: 18px; font-weight: 600; }
+.dscore.benefit .dscore-val { color: var(--green); }
+.dscore.burnout .dscore-val { color: var(--accent); }
+.decision-reason {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--mono);
+  line-height: 1.7;
+  border-top: 1px solid var(--rule);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+/* ── Feedback review (teacher-in-the-loop) ── */
+.tab-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-left: 5px;
+  animation: pulse-bar 1.2s ease-in-out infinite;
+}
+.review-banner {
+  background: #fff8e8;
+  border: 1px solid #e8c98a;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--amber);
+}
+.review-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.review-col-hd {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.review-col-hd.teacher { color: var(--accent2); }
+.review-ai-text {
+  background: #f4f1eb;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 14px;
+  font-size: 13px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  color: var(--text);
+  min-height: 160px;
+}
+.review-edit-box {
+  width: 100%;
+  min-height: 160px;
+  background: white;
+  border: 1.5px solid var(--accent2);
+  border-radius: 6px;
+  padding: 14px;
+  font-size: 13px;
+  line-height: 1.8;
+  font-family: var(--serif);
+  color: var(--text);
+  resize: vertical;
+  outline: none;
+}
+.review-highlight-row { margin-bottom: 14px; }
+.review-highlight-row label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.review-highlight-input {
+  width: 100%;
+  border: 1px solid var(--rule2);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: var(--serif);
+  outline: none;
+}
+.review-highlight-input:focus { border-color: var(--accent2); }
+.btn-approve {
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 4px;
+  padding: 10px 22px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-approve:hover { background: var(--green); }
+.approved-card {
+  background: #edfff5;
+  border: 1px solid #aaddbb;
+  border-radius: 8px;
+  padding: 18px 20px;
+  margin-bottom: 18px;
+}
+.approved-card-hd {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--green);
+  margin-bottom: 10px;
+}
+.approved-highlight { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--accent); margin-bottom: 8px; }
+.approved-text { font-size: 13px; line-height: 1.9; color: var(--ink); white-space: pre-wrap; }
+
+.tips-block { margin-top: 22px; }
+.tips-comment {
+  background: #eef2fb;
+  border: 1px solid #c3cfe8;
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--ink);
+  margin-bottom: 14px;
+}
+.tips-col-hd {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+}
+.tips-col-hd.good { color: var(--green); }
+.tips-col-hd.warn { color: var(--accent); }
+.tips-section-hd {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  margin: 16px 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--rule);
+}
+.tip-item {
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.tip-item.good { background: #f6fff9; border-color: #bde5c8; }
+.tip-item.warn { background: #fff6f4; border-color: #e5c0b8; }
+.tip-item.neutral { background: #f7f6f3; border-color: var(--rule); }
+.tip-item-label { font-family: var(--mono); font-size: 9px; color: var(--muted); margin-bottom: 3px; }
+.tip-item-sub { font-size: 11px; color: var(--muted); margin-top: 5px; }
+.tip-item-principle { font-family: var(--serif); font-size: 11px; line-height: 1.6; color: var(--accent); margin-top: 4px; }
+
+.style-summary {
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--muted);
+  margin-top: 10px;
+}
+.style-summary b { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Masthead -->
+  <div class="masthead">
+    <div>
+      <div class="masthead-title">Quiz Pipeline</div>
+      <div class="masthead-sub">Teacher Console</div>
+    </div>
+    <div class="masthead-sep"></div>
+    <a href="/student" target="_blank" class="masthead-link">↗ Student Page</a>
+  </div>
+
+  <div class="main">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+
+      <!-- API Key -->
+      <div class="sb-section">
+        <div class="sb-label">OpenAI API Key</div>
+        <input id="apiKey" class="key-input" type="password" placeholder="sk-..." />
+      </div>
+
+      <!-- sampdoc upload -->
+      <div class="sb-section">
+        <div class="sb-label">Reference Documents (sampdoc)</div>
+        <div class="dropzone" id="dz-sampdoc"
+             ondragover="dzOver(event,'dz-sampdoc')"
+             ondragleave="dzLeave('dz-sampdoc')"
+             ondrop="dzDrop(event,'sampdoc')">
+          <input type="file" multiple accept=".txt,.json,.docx,.doc"
+                 onchange="pickFiles(event,'sampdoc')" />
+          <div class="dz-icon">📋</div>
+          <div class="dz-text">Drag and drop or <span>click to upload</span><br/>.txt .json .docx .doc</div>
+        </div>
+        <div class="file-list" id="fl-sampdoc"></div>
+      </div>
+
+      <!-- syl upload -->
+      <div class="sb-section">
+        <div class="sb-label">Syllabus Files (syl)</div>
+        <div class="dropzone" id="dz-syl"
+             ondragover="dzOver(event,'dz-syl')"
+             ondragleave="dzLeave('dz-syl')"
+             ondrop="dzDrop(event,'syl')">
+          <input type="file" multiple accept=".txt,.json,.docx,.doc"
+                 onchange="pickFiles(event,'syl')" />
+          <div class="dz-icon">📚</div>
+          <div class="dz-text">Drag and drop or <span>click to upload</span><br/>.txt .json .docx .doc</div>
+        </div>
+        <div class="file-list" id="fl-syl"></div>
+      </div>
+
+      <!-- Run -->
+      <div class="sb-section">
+        <button class="btn-run" id="btnRun" onclick="runPipeline()" disabled>
+          ▶ Start Pipeline
+        </button>
+      </div>
+
+      <!-- Stage indicators -->
+      <div class="stages" id="stages">
+        <div class="stage-dot" id="sd1"></div>
+        <div class="stage-dot" id="sd2"></div>
+        <div class="stage-dot" id="sd4a"></div>
+        <div class="stage-dot" id="sd5"></div>
+        <div class="stage-dot" id="sd4b"></div>
+      </div>
+      <div class="stage-labels">
+        <div class="stage-label" id="sl1">S1</div>
+        <div class="stage-label" id="sl2">S2</div>
+        <div class="stage-label" id="sl4a">S4a</div>
+        <div class="stage-label" id="sl5">S5</div>
+        <div class="stage-label" id="sl4b">S4b</div>
+      </div>
+
+      <!-- Log -->
+      <div class="log-wrap">
+        <div class="sb-label">Run Log</div>
+        <div class="log-box" id="logBox">
+          <div class="log-line"><span class="log-msg info">Waiting to start...</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right panel -->
+    <div class="right">
+      <div class="panel-header">
+        <span class="panel-title">Pipeline Status</span>
+        <span class="status-badge" id="statusBadge">Idle</span>
+      </div>
+
+      <div class="panel-body" id="panelBody">
+        <div class="empty-state" id="emptyState">
+          <div class="empty-icon">🎓</div>
+          <div>Upload files and start the pipeline<br/>Results will appear here</div>
+        </div>
+
+        <!-- Stats -->
+        <div id="statsArea" style="display:none">
+          <div class="status-grid">
+            <div class="stat-card">
+              <div class="stat-card-label">Current Stage</div>
+              <div class="stat-card-value amber" id="stageVal">—</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-label">Pipeline Status</div>
+              <div class="stat-card-value" id="statusVal">Idle</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-label">Current Round</div>
+              <div class="stat-card-value accent" id="roundVal">—</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-label">Round 1 Questions</div>
+              <div class="stat-card-value green" id="q1Val">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Questions + Skillmap + Decisions tabs -->
+        <div id="tabArea" style="display:none">
+          <div class="tabs">
+            <button class="tab active" onclick="switchTab('q1')" id="tab-q1">Round 1 Questions</button>
+            <button class="tab" onclick="switchTab('skillmap')" id="tab-skillmap">Skill Map</button>
+            <button class="tab" onclick="switchTab('decisions')" id="tab-decisions">AI Decisions</button>
+            <button class="tab" onclick="switchTab('qlatest')" id="tab-qlatest">Latest Round Questions</button>
+            <button class="tab" onclick="switchTab('review')" id="tab-review">Feedback Review</button>
+          </div>
+          <div id="pane-q1"></div>
+          <div id="pane-skillmap" style="display:none"></div>
+          <div id="pane-decisions" style="display:none"></div>
+          <div id="pane-qlatest" style="display:none"></div>
+          <div id="pane-review" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;
+let sampdocFiles = [], sylFiles = [];
+let es = null;
+let allDecisions = [];
+
+// ── Dropzone helpers ─────────────────────────────────────
+function dzOver(e, id) { e.preventDefault(); document.getElementById(id).classList.add('drag'); }
+function dzLeave(id)   { document.getElementById(id).classList.remove('drag'); }
+function dzDrop(e, zone) {
+  e.preventDefault();
+  const id = zone === 'sampdoc' ? 'dz-sampdoc' : 'dz-syl';
+  document.getElementById(id).classList.remove('drag');
+  handleFiles(Array.from(e.dataTransfer.files), zone);
+}
+function pickFiles(e, zone) { handleFiles(Array.from(e.target.files), zone); }
+
+function handleFiles(files, zone) {
+  const allowed = ['.txt','.json','.docx','.doc'];
+  const filtered = files.filter(f => allowed.some(ext => f.name.toLowerCase().endsWith(ext)));
+  if (zone === 'sampdoc') sampdocFiles = filtered;
+  else                    sylFiles     = filtered;
+  renderFileList(zone);
+  checkRunnable();
+}
+
+function renderFileList(zone) {
+  const files = zone === 'sampdoc' ? sampdocFiles : sylFiles;
+  const el    = document.getElementById('fl-' + zone);
+  el.innerHTML = files.map(f => {
+    const ext = f.name.split('.').pop().toUpperCase();
+    return `<div class="file-chip"><span class="chip-ext">${ext}</span><span class="chip-name">${f.name}</span></div>`;
+  }).join('');
+}
+
+function checkRunnable() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  document.getElementById('btnRun').disabled =
+    !(sampdocFiles.length > 0 && sylFiles.length > 0 && apiKey);
+}
+document.getElementById('apiKey').addEventListener('input', checkRunnable);
+
+// ── Upload ───────────────────────────────────────────────
+async function uploadAll() {
+  const upload = async (files, endpoint) => {
+    if (!files.length) return;
+    const fd = new FormData();
+    files.forEach(f => fd.append('files', f));
+    await fetch(`${API}${endpoint}`, { method: 'POST', body: fd });
+  };
+  await upload(sampdocFiles, '/upload/sampdoc');
+  await upload(sylFiles, '/upload/syl');
+}
+
+// ── Run Pipeline ─────────────────────────────────────────
+async function runPipeline() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) return;
+
+  document.getElementById('btnRun').disabled = true;
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('statsArea').style.display = 'block';
+
+  addLog('Uploading files...', 'info');
+  try {
+    await uploadAll();
+    addLog('Files uploaded successfully', 'ok');
+  } catch(e) {
+    addLog('Upload failed: ' + e.message, 'err');
+    return;
+  }
+
+  const resp = await fetch(`${API}/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ api_key: apiKey }),
+  });
+  const data = await resp.json();
+  if (data.error) { addLog('Failed to start: ' + data.error, 'err'); return; }
+
+  addLog('Pipeline started', 'ok');
+  connectSSE();
+}
+
+// ── SSE ──────────────────────────────────────────────────
+function connectSSE() {
+  if (es) es.close();
+  es = new EventSource(`${API}/stream/teacher`);
+
+  es.addEventListener('stage', e => {
+    const d = JSON.parse(e.data);
+    addLog(d.message, d.status === 'done' ? 'ok' : 'info');
+    updateStageUI(d.stage, d.status);
+  });
+
+  es.addEventListener('waiting_answers', e => {
+    const d = JSON.parse(e.data);
+    addLog(d.message, 'warn');
+    const rn = d.round || 1;
+    setStatusBadge('waiting', 'Awaiting answers');
+    setStatusVal(`Waiting for round ${rn} answers`);
+    setRoundVal(rn);
+  });
+
+  es.addEventListener('answers_received', e => {
+    const d = JSON.parse(e.data);
+    addLog(d.message, 'ok');
+  });
+
+  es.addEventListener('analyzing', e => {
+    const d = JSON.parse(e.data);
+    addLog(d.message, 'info');
+    setStatusBadge('running', 'Analyzing');
+  });
+
+  es.addEventListener('deciding', e => {
+    const d = JSON.parse(e.data);
+    addLog(d.message, 'info');
+    setStatusBadge('running', 'Deciding');
+    setStatusVal(`Evaluating whether to continue after round ${d.round}`);
+  });
+
+  es.addEventListener('decision', e => {
+    const d = JSON.parse(e.data);
+    if (d.benefit_score != null) {
+      const verdict = d.continue ? '✓ Continue' : '✗ Stop';
+      addLog(`Agent decision [round ${d.round}] benefit:${d.benefit_score} risk:${d.burnout_score} → ${verdict}`, d.continue ? 'ok' : 'warn');
+      allDecisions.push(d);
+      renderDecisions();
+      document.getElementById('tabArea').style.display = 'block';
+    }
+    if (!d.continue && d.reason) addLog('Stop reason: ' + d.reason, 'warn');
+  });
+
+  es.addEventListener('skillmap_ready', e => {
+    const d = JSON.parse(e.data);
+    addLog(`Round ${d.round || 1} skill map generated`, 'ok');
+    renderSkillmap(d.skillmap);
+    document.getElementById('tabArea').style.display = 'block';
+  });
+
+  es.addEventListener('done', e => {
+    const d = JSON.parse(e.data);
+    addLog(d.message, 'ok');
+    setStatusBadge('done', 'Completed');
+    setStatusVal(`All done (${d.total_rounds || '?'} round(s) total)`);
+    setStageVal('Complete ✓');
+    loadLatestQuestions();
+    if (d.stop_reason) addLog('End reason: ' + d.stop_reason, 'warn');
+  });
+
+  // ── Teacher-in-the-loop feedback review ──────────────────
+  es.addEventListener('feedback_pending', e => {
+    const d = JSON.parse(e.data);
+    addLog('AI feedback draft generated, awaiting your review', 'warn');
+    document.getElementById('tabArea').style.display = 'block';
+    renderFeedbackPending(d.draft);
+    switchTab('review');  // Requires teacher action, switch tabs to prompt them
+  });
+
+  es.addEventListener('feedback_approved', e => {
+    const d = JSON.parse(e.data);
+    addLog(d.edited ? 'Feedback approved (edited by teacher) and sent to student' : 'Feedback approved as-is and sent to student', 'ok');
+    renderFeedbackApproved(d.feedback, d.edited);
+  });
+
+  es.addEventListener('tutor_tips', e => {
+    const d = JSON.parse(e.data);
+    addLog('Feedback quality tips generated', 'info');
+    renderTutorTips(d.tips);
+  });
+
+  es.addEventListener('error', e => {
+    try { addLog('Error: ' + JSON.parse(e.data).message, 'err'); } catch(_) {}
+    setStatusBadge('error', 'Error');
+  });
+
+  es.onerror = () => addLog('SSE connection interrupted', 'warn');
+  startQuestionPolling();
+}
+
+// ── Polling ───────────────────────────────────────────────
+let pollTimer = null;
+function startQuestionPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(loadLatestQuestions, 5000);
+}
+
+async function loadLatestQuestions() {
+  try {
+    const r1 = await fetch(`${API}/questions`).then(r => r.json());
+    if (r1.ready && r1.questions.length > 0) {
+      renderQuestions('pane-q1', r1.questions);
+      document.getElementById('q1Val').textContent =
+        r1.questions.reduce((a,c) => a + (c.generated_questions?.length||0), 0) + ' questions';
+      document.getElementById('tabArea').style.display = 'block';
+    }
+
+    const cur = await fetch(`${API}/questions/current`).then(r => r.json());
+    if (cur.ready && cur.questions.length > 0) {
+      renderQuestions('pane-qlatest', cur.questions);
+      const rn = cur.round;
+      setRoundVal(rn);
+      document.getElementById('tab-qlatest').textContent = `Round ${rn} Questions`;
+    }
+
+    const sm = await fetch(`${API}/skillmap`).then(r => r.json());
+    if (sm.ready) renderSkillmap(sm.skillmap);
+
+    const dec = await fetch(`${API}/decisions`).then(r => r.json());
+    if (dec.decisions?.length > allDecisions.length) {
+      allDecisions = dec.decisions;
+      renderDecisions();
+    }
+
+    // Only pull feedback state when we're not already showing an in-progress review
+    // (avoid clobbering the teacher's edits mid-typing via periodic polling)
+    if (!currentDraft) await _loadFeedbackState();
+  } catch(_) {}
+}
+
+// ── Render questions ──────────────────────────────────────
+function renderQuestions(paneId, allQuestions) {
+  const pane = document.getElementById(paneId);
+  let html = '';
+  allQuestions.forEach(courseQ => {
+    html += `<div class="section-hd">${courseQ.course_name || courseQ.source_file} — Round ${courseQ.round||1}</div>`;
+    (courseQ.generated_questions || []).forEach((q, i) => {
+      const opts = (q.options || []).map((opt, oi) => {
+        const letter = 'ABCD'[oi];
+        const isCorrect = q.answer && q.answer.toUpperCase() === letter;
+        return `<div class="q-opt${isCorrect?' correct':''}">${opt}</div>`;
+      }).join('');
+      html += `
+        <div class="q-card">
+          <div class="q-meta">
+            <span class="q-num">Q${String(i+1).padStart(2,'0')}</span>
+            <span class="q-tag bloom">${q.bloom_level||''}</span>
+            <span class="q-tag diff">${q.difficulty||''}</span>
+          </div>
+          <div class="q-text">${q.question}</div>
+          <div class="q-options">${opts}</div>
+          ${q.explanation ? `<div style="margin-top:8px;font-size:11px;color:var(--muted);font-family:var(--mono)">💡 ${q.explanation}</div>` : ''}
+        </div>`;
+    });
+  });
+  pane.innerHTML = html;
+}
+
+// ── Render decisions ──────────────────────────────────────
+function renderDecisions() {
+  const pane = document.getElementById('pane-decisions');
+  if (!allDecisions.length) {
+    pane.innerHTML = '<div style="color:var(--muted);font-family:var(--mono);font-size:11px">No decision records yet</div>';
+    return;
+  }
+  let html = '<div class="section-hd">Agent Decision History</div>';
+  allDecisions.forEach(d => {
+    const cls   = d.continue ? 'go' : 'stop';
+    const label = d.continue ? `✓ Continue to round ${d.round + 1}` : `✗ Stopped after round ${d.round}`;
+    html += `
+      <div class="decision-row">
+        <div class="decision-row-header">
+          <span class="decision-round-badge ${cls}">Round ${d.round}</span>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">${label}</span>
+        </div>
+        <div class="decision-scores">
+          <div class="dscore benefit">
+            <div class="dscore-label">Progress Benefit</div>
+            <div class="dscore-val">${d.benefit_score ?? '—'}</div>
+          </div>
+          <div class="dscore burnout">
+            <div class="dscore-label">Burnout Risk</div>
+            <div class="dscore-val">${d.burnout_score ?? '—'}</div>
+          </div>
+        </div>
+        ${d.benefit_reasoning || d.burnout_reasoning ? `
+        <div class="decision-reason">
+          ${d.benefit_reasoning ? `[Benefit] ${d.benefit_reasoning}` : ''}
+          ${d.benefit_reasoning && d.burnout_reasoning ? '<br>' : ''}
+          ${d.burnout_reasoning ? `[Risk] ${d.burnout_reasoning}` : ''}
+        </div>` : ''}
+        <div class="decision-reason" style="border-top:none;padding-top:0;margin-top:4px;opacity:.7">${d.reason || ''}</div>
+      </div>`;
+  });
+
+  pane.innerHTML = html;
+  document.getElementById('tab-decisions').textContent = `AI Decisions (${allDecisions.length})`;
+}
+
+// ── Feedback review (teacher-in-the-loop) ──────────────────
+let currentDraft = null;   // AI draft awaiting review, or null if none pending
+
+function renderFeedbackPending(draft) {
+  currentDraft = draft;
+  const pane = document.getElementById('pane-review');
+  const tabBtn = document.getElementById('tab-review');
+  tabBtn.innerHTML = 'Feedback Review <span class="tab-dot"></span>';
+
+  pane.innerHTML = `
+    <div class="review-banner">⏳ The AI has generated a feedback draft (round ${draft.round}). Please review and approve it — the student will only see the version you confirm.</div>
+    <div class="review-cols">
+      <div>
+        <div class="review-col-hd">AI Original Draft (read-only)</div>
+        <div class="review-ai-text">${(draft.feedback || '').replace(/</g,'&lt;')}</div>
+      </div>
+      <div>
+        <div class="review-col-hd teacher">Your Final Version (editable)</div>
+        <textarea class="review-edit-box" id="reviewEditBox">${(draft.feedback || '')}</textarea>
+      </div>
+    </div>
+    <div class="review-highlight-row">
+      <label>One-line highlight summary</label>
+      <input class="review-highlight-input" id="reviewHighlightInput" value="${(draft.highlight || '').replace(/"/g,'&quot;')}" />
+    </div>
+    <button class="btn-approve" id="btnApproveFeedback" onclick="submitFeedbackApproval()">Approve &amp; Send to Student →</button>
+    <div id="tutorTipsArea" class="tips-block"></div>
+  `;
+}
+
+async function submitFeedbackApproval() {
+  const btn = document.getElementById('btnApproveFeedback');
+  const feedback  = document.getElementById('reviewEditBox').value.trim();
+  const highlight = document.getElementById('reviewHighlightInput').value.trim();
+  if (!feedback) { alert('Feedback text cannot be empty'); return; }
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const aiText = (currentDraft?.feedback || '').trim();
+  const edited = feedback !== aiText;
+  if (!apiKey) {
+    // Whether edited or not, the teacher's decision (even an as-is approval) still needs to be sent to the two analysis agents
+    const proceed = confirm(
+      'No API Key entered.\n' +
+      'Style analysis (TutorStyle) and the three-perspective feedback quality tips cannot be generated — only the feedback itself will be sent.\n\n' +
+      'Do you still want to submit?'
+    );
+    if (!proceed) return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+  try {
+    const res = await fetch(`${API}/feedback/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: apiKey, feedback, highlight }),
+    });
+    const data = await res.json();
+    if (data.error) { alert(data.error); btn.disabled = false; btn.textContent = 'Approve & Send to Student →'; return; }
+    // renderFeedbackApproved / renderTutorTips will also be triggered by SSE,
+    // but render immediately here too for responsiveness.
+    document.getElementById('tab-review').textContent = 'Feedback Review';
+  } catch (e) {
+    alert('Submission failed: ' + e);
+    btn.disabled = false;
+    btn.textContent = 'Approve & Send to Student →';
+  }
+}
+
+function renderFeedbackApproved(final, edited) {
+  currentDraft = null;
+  document.getElementById('tab-review').textContent = 'Feedback Review';
+  const pane = document.getElementById('pane-review');
+  pane.innerHTML = `
+    <div class="approved-card">
+      <div class="approved-card-hd">✓ Sent to student ${edited ? '(edited by teacher)' : '(approved as-is)'}</div>
+      ${final.highlight ? `<div class="approved-highlight">✨ ${final.highlight}</div>` : ''}
+      <div class="approved-text">${final.feedback || ''}</div>
+    </div>
+    <div id="tutorTipsArea" class="tips-block"></div>
+  `;
+  if (window._lastTips) renderTutorTips(window._lastTips);
+}
+
+function renderTutorTips(tips) {
+  window._lastTips = tips;
+  const el = document.getElementById('tutorTipsArea');
+  if (!el || !tips) return;
+
+  const stanceClass = s => s === 'good' ? 'good' : (s === 'concern' ? 'warn' : 'neutral');
+  const stanceIcon  = s => s === 'good' ? '✓' : (s === 'concern' ? '⚠' : '·');
+
+  const renderSection = (title, items, bodyFn) => {
+    if (!items || !items.length) return '';
+    let h = `<div class="tips-section-hd">${title}</div>`;
+    items.forEach(it => {
+      const cls = stanceClass(it.stance);
+      h += `<div class="tip-item ${cls}">
+        <div class="tip-item-label">${stanceIcon(it.stance)} ${it.observation || ''}</div>
+        ${bodyFn(it)}
+      </div>`;
+    });
+    return h;
+  };
+
+  let html = `<div class="section-hd">Feedback Quality Tips (Tutor Advise Agent)${tips.edited === false ? ' — approved as-is by teacher' : ''}</div>`;
+  if (tips.overall_comment) {
+    html += `<div class="tips-comment">${tips.overall_comment}</div>`;
+  }
+
+  html += renderSection('① Teacher Behavior', tips.behavioral, it =>
+    it.note ? `<div class="tip-item-sub">${it.note}</div>` : ''
+  );
+
+  html += renderSection('② Pedagogical Feedback Strategy', tips.pedagogical, it => `
+    ${it.principle ? `<div class="tip-item-principle">${it.principle}</div>` : ''}
+    ${it.impact ? `<div class="tip-item-sub">Impact: ${it.impact}</div>` : ''}
+  `);
+
+  html += renderSection('③ Feedback Literacy · Professional Growth', tips.growth, it => `
+    ${it.lens ? `<div class="tip-item-principle">${it.lens}</div>` : ''}
+    ${it.suggestion ? `<div class="tip-item-sub">Suggestion: ${it.suggestion}</div>` : ''}
+  `);
+
+  if (!(tips.behavioral||[]).length && !(tips.pedagogical||[]).length && !(tips.growth||[]).length) {
+    html += `<div style="color:var(--muted);font-family:var(--mono);font-size:11px">No specific items generated this time</div>`;
+  }
+  el.innerHTML = html;
+}
+
+// Restore review state on page load / SSE reconnect (in case teacher refreshed mid-review)
+async function _loadFeedbackState() {
+  try {
+    const draft = await fetch(`${API}/feedback/draft`).then(r => r.json());
+    if (draft.ready) {
+      document.getElementById('tabArea').style.display = 'block';
+      renderFeedbackPending(draft.draft);
+      return;
+    }
+    const fb = await fetch(`${API}/feedback`).then(r => r.json());
+    if (fb.ready) {
+      document.getElementById('tabArea').style.display = 'block';
+      renderFeedbackApproved(fb, fb.edited);
+    }
+    const tips = await fetch(`${API}/tutor-tips`).then(r => r.json());
+    if (tips.ready) renderTutorTips(tips.tips);
+  } catch(_) {}
+}
+
+// ── Render skillmap ───────────────────────────────────────
+function renderSkillmap(sm) {
+  if (!sm) return;
+  const pane = document.getElementById('pane-skillmap');
+  const single = !Array.isArray(sm);
+  const maps = single ? [sm] : sm;
+  let html = '';
+  maps.forEach(m => {
+    const perf = m.student_performance_summary || {};
+    html += `
+      <div class="section-hd">Answer Overview — ${m.source_file||''}</div>
+      <div class="status-grid" style="margin-bottom:20px">
+        <div class="stat-card"><div class="stat-card-label">Total Questions</div><div class="stat-card-value">${perf.total_questions||5}</div></div>
+        <div class="stat-card"><div class="stat-card-label">Correct</div><div class="stat-card-value green">${perf.correct_count||0}</div></div>
+        <div class="stat-card"><div class="stat-card-label">Accuracy</div><div class="stat-card-value amber">${perf.accuracy_rate||'—'}</div></div>
+      </div>
+      <div class="skill-grid">
+        <div class="skill-col">
+          <div class="skill-col-hd strength">✓ Strengths</div>
+          ${(m.strengths||[]).map(s=>`<div class="skill-item"><div class="skill-item-id">${s.objective_id}</div>${s.objective_description}<div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:var(--mono)">${s.evidence||''}</div></div>`).join('') || '<div class="skill-item" style="color:var(--muted)">None yet</div>'}
+        </div>
+        <div class="skill-col">
+          <div class="skill-col-hd weakness">✗ Weaknesses</div>
+          ${(m.weaknesses||[]).map(s=>`<div class="skill-item"><div class="skill-item-id">${s.objective_id}</div>${s.objective_description}<div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:var(--mono)">${s.evidence||''}</div></div>`).join('') || '<div class="skill-item" style="color:var(--muted)">None yet</div>'}
+        </div>
+      </div>
+      ${m.recommended_to_verify?.length ? `
+        <div class="section-hd" style="margin-top:16px">Skills to Verify</div>
+        ${m.recommended_to_verify.map(s=>`<div class="skill-item" style="margin-bottom:8px"><div class="skill-item-id" style="color:var(--amber)">${s.objective_id}</div>${s.objective_description}</div>`).join('')}
+      ` : ''}
+      ${m.recommendations?.length ? `
+        <div class="section-hd" style="margin-top:16px">Learning Recommendations</div>
+        <div class="rec-list">${m.recommendations.map(r=>`<div class="rec-item">${r}</div>`).join('')}</div>
+      ` : ''}
+    `;
+  });
+  pane.innerHTML = html;
+}
+
+// ── UI helpers ────────────────────────────────────────────
+function addLog(msg, type='info') {
+  const box = document.getElementById('logBox');
+  const ts  = new Date().toLocaleTimeString('zh-CN',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="log-ts">${ts}</span><span class="log-msg ${type}">${msg}</span>`;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+const stageMap = { 1: ['sd1','sl1'], 2: ['sd2','sl2'], 4: ['sd4a','sl4a'], 5: ['sd5','sl5'] };
+let lastStage4Done = false;
+function updateStageUI(stage, status) {
+  const key  = stage === 4 && lastStage4Done ? 'sd4b' : (stageMap[stage]?.[0] ?? null);
+  const lkey = stage === 4 && lastStage4Done ? 'sl4b' : (stageMap[stage]?.[1] ?? null);
+  if (!key) return;
+  const dot = document.getElementById(key);
+  const lbl = document.getElementById(lkey);
+  if (!dot || !lbl) return;
+  if (status === 'done') {
+    dot.className = 'stage-dot done';
+    lbl.className = 'stage-label done';
+    if (stage === 4 && !lastStage4Done) lastStage4Done = true;
+    setStatusBadge('running', 'Running');
+    setStageVal('S' + stage + (stage===4?(lastStage4Done?'b':'a'):'') + ' Done');
+  } else {
+    dot.className = 'stage-dot active';
+    lbl.className = 'stage-label active';
+    setStatusBadge('running', 'Running');
+    setStageVal('Stage ' + stage);
+  }
+}
+
+function setStatusBadge(cls, text) {
+  const b = document.getElementById('statusBadge');
+  b.className = 'status-badge ' + cls;
+  b.textContent = text;
+}
+function setStageVal(v)  { document.getElementById('stageVal').textContent = v; }
+function setStatusVal(v) { document.getElementById('statusVal').textContent = v; }
+function setRoundVal(v)  {
+  const el = document.getElementById('roundVal');
+  if (el) el.textContent = `Round ${v} / max 10`;
+}
+
+function switchTab(name) {
+  ['q1','skillmap','decisions','qlatest','review'].forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('active', t === name);
+    document.getElementById('pane-' + t).style.display = t === name ? 'block' : 'none';
+  });
+}
+</script>
+</body>
+</html>

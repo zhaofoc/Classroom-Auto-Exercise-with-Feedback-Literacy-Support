@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Quiz Pipeline — Student</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=ZCOOL+XiaoWei&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sky:      #e8f4fd;
+  --cloud:    #f7fbff;
+  --ink:      #1a2336;
+  --rule:     #d0dce8;
+  --accent:   #2563c0;
+  --green:    #16803c;
+  --red:      #c0392b;
+  --amber:    #c07a16;
+  --text:     #1a2336;
+  --muted:    #6b7a94;
+  --card:     #ffffff;
+  --mono:     'IBM Plex Mono', monospace;
+  --display:  'ZCOOL XiaoWei', serif;
+  --body:     'Noto Sans SC', sans-serif;
+}
+
+body {
+  background: var(--sky);
+  color: var(--text);
+  font-family: var(--body);
+  min-height: 100vh;
+  font-size: 14px;
+}
+
+/* ── Top bar ── */
+.topbar {
+  background: var(--ink);
+  color: white;
+  padding: 0 24px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.topbar-title {
+  font-family: var(--display);
+  font-size: 18px;
+  letter-spacing: 0.05em;
+  color: white;
+}
+.topbar-sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: #88a0c0;
+  letter-spacing: 0.1em;
+}
+.topbar-sep { flex: 1; }
+.topbar-status {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid #334;
+  color: #88a0c0;
+  letter-spacing: 0.08em;
+  transition: all 0.3s;
+}
+.topbar-status.live { border-color: #4ec98d; color: #4ec98d; background: #0d2219; }
+.topbar-status.quiz { border-color: #7ab4f0; color: #7ab4f0; background: #0d1a2d; }
+.topbar-status.done { border-color: #4ec98d; color: #4ec98d; background: #0d2219; }
+
+/* ── Main container ── */
+.container {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px 16px 60px;
+}
+
+/* ── Waiting screen ── */
+.waiting-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 24px;
+  text-align: center;
+}
+
+.waiting-anim {
+  width: 80px;
+  height: 80px;
+  position: relative;
+}
+.waiting-anim .ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  border-top-color: var(--accent);
+  animation: spin 1.2s linear infinite;
+}
+.waiting-anim .ring2 {
+  inset: 10px;
+  border-top-color: transparent;
+  border-right-color: var(--accent);
+  opacity: 0.5;
+  animation-duration: 0.9s;
+  animation-direction: reverse;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.waiting-title {
+  font-family: var(--display);
+  font-size: 24px;
+  color: var(--ink);
+}
+.waiting-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  max-width: 320px;
+  line-height: 1.8;
+}
+
+/* ── Course header ── */
+.course-header {
+  background: var(--ink);
+  color: white;
+  border-radius: 12px;
+  padding: 24px 28px;
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+}
+.course-header::before {
+  content: '';
+  position: absolute;
+  right: -20px;
+  top: -20px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(37,99,192,0.3);
+}
+.course-header::after {
+  content: '';
+  position: absolute;
+  right: 40px;
+  top: 40px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(37,99,192,0.15);
+}
+.course-tag {
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: #7ab4f0;
+  margin-bottom: 8px;
+}
+.course-name {
+  font-family: var(--display);
+  font-size: 22px;
+  color: white;
+  margin-bottom: 12px;
+  position: relative;
+  z-index: 1;
+}
+.course-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.course-meta-item {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: #88a0c0;
+}
+.course-meta-item strong { color: #c0d8f0; }
+
+/* ── Progress bar ── */
+.progress-wrap {
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.progress-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+  min-width: 60px;
+}
+.progress-bar-wrap { flex: 1; height: 6px; background: var(--rule); border-radius: 3px; overflow: hidden; }
+.progress-bar { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.4s ease; }
+.progress-count { font-family: var(--mono); font-size: 11px; color: var(--accent); font-weight: 600; flex-shrink: 0; }
+
+/* ── Question card ── */
+.q-card {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 28px 28px 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  animation: fadeup 0.3s ease both;
+}
+@keyframes fadeup {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.q-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.q-num-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.q-num-badge.answered { background: var(--green); }
+.q-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.q-tag {
+  font-family: var(--mono);
+  font-size: 9px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--rule);
+  color: var(--muted);
+}
+
+.q-text {
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--text);
+  font-weight: 400;
+  margin-bottom: 20px;
+}
+
+/* ── Options ── */
+.options { display: flex; flex-direction: column; gap: 10px; }
+.opt-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1.5px solid var(--rule);
+  border-radius: 8px;
+  background: #fafcff;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+  width: 100%;
+  font-family: var(--body);
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.5;
+}
+.opt-btn:hover:not(:disabled) { border-color: var(--accent); background: #eef4ff; }
+.opt-btn.selected { border-color: var(--accent); background: #e8f0ff; }
+.opt-btn.correct  { border-color: var(--green); background: #edfff5; color: var(--green); }
+.opt-btn.wrong    { border-color: var(--red); background: #fff0ee; color: var(--red); }
+.opt-btn.reveal-correct { border-color: var(--green); background: #edfff5; color: var(--green); opacity: 0.7; }
+.opt-btn:disabled { cursor: default; }
+
+.opt-letter {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--rule);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.opt-btn.selected .opt-letter { background: var(--accent); color: white; }
+.opt-btn.correct  .opt-letter { background: var(--green); color: white; }
+.opt-btn.wrong    .opt-letter { background: var(--red); color: white; }
+.opt-btn.reveal-correct .opt-letter { background: var(--green); color: white; }
+
+.opt-expl {
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  padding: 6px 10px;
+  background: #f5f8ff;
+  border-radius: 4px;
+  border-left: 2px solid var(--accent);
+  line-height: 1.6;
+  display: none;
+}
+.opt-expl.show { display: block; }
+
+/* ── Submit button ── */
+.submit-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 24px;
+}
+.btn-submit {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 14px 40px;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-submit:hover:not(:disabled) { background: #1a4ea8; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,192,0.3); }
+.btn-submit:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* ── Result screen ── */
+.result-screen { animation: fadeup 0.4s ease both; }
+
+.result-banner {
+  border-radius: 12px;
+  padding: 28px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+.result-banner.pass {
+  background: linear-gradient(135deg, #0d3d2a, #1a6040);
+  color: white;
+}
+.result-banner.fail {
+  background: linear-gradient(135deg, #2c1a0d, #4a3010);
+  color: white;
+}
+.result-score {
+  font-family: var(--display);
+  font-size: 56px;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.result-score-label { font-family: var(--mono); font-size: 12px; opacity: 0.7; letter-spacing: 0.1em; }
+.result-msg { font-size: 16px; margin-top: 16px; opacity: 0.9; }
+
+/* ── Round 2 notification ── */
+.round2-notif {
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  animation: fadeup 0.4s ease 0.3s both;
+}
+.round2-icon { font-size: 28px; flex-shrink: 0; }
+.round2-text h3 { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+.round2-text p  { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+.btn-round2 {
+  margin-left: auto;
+  background: var(--ink);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.btn-round2:hover { background: var(--accent); }
+.btn-round2:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Multi-course tabs ── */
+.course-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 20px;
+  background: var(--rule);
+  padding: 3px;
+  border-radius: 8px;
+}
+.course-tab {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.course-tab.active { background: white; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+/* ── Spinner inline ── */
+.spinner {
+  width: 14px; height: 14px;
+  border: 2px solid var(--rule); border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+/* ── Agent decision card ── */
+.decision-card {
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  animation: fadeup 0.4s ease 0.2s both;
+}
+.decision-card-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+.agent-scores {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.agent-score-item {
+  flex: 1;
+  border-radius: 8px;
+  padding: 12px 14px;
+  text-align: center;
+}
+.agent-score-item.benefit { background: #edfff5; border: 1px solid #aaddbb; }
+.agent-score-item.burnout { background: #fff0ee; border: 1px solid #ddbbaa; }
+.agent-score-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.7;
+  margin-bottom: 4px;
+}
+.agent-score-val {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1;
+}
+.agent-score-item.benefit .agent-score-val { color: var(--green); }
+.agent-score-item.burnout .agent-score-val { color: var(--red); }
+.agent-score-reasoning {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--mono);
+  line-height: 1.7;
+}
+
+/* ── Stop reason banner ── */
+.stop-banner {
+  background: linear-gradient(135deg, #1a2336, #2c3a52);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  color: white;
+  animation: fadeup 0.4s ease both;
+}
+.stop-banner-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #88a0c0;
+  margin-bottom: 6px;
+}
+.stop-banner-reason { font-size: 13px; line-height: 1.6; opacity: 0.9; }
+
+/* ── Next-round waiting overlay ── */
+.next-round-waiting {
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 32px 28px;
+  margin-bottom: 24px;
+  text-align: center;
+  animation: fadeup 0.3s ease both;
+}
+.next-round-title {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.next-round-sub {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: var(--mono);
+  line-height: 1.7;
+}
+.round-badge {
+  display: inline-block;
+  background: var(--accent);
+  color: white;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.08em;
+  margin-bottom: 14px;
+}
+
+/* ── Feedback card ── */
+.feedback-card {
+  background: linear-gradient(135deg, #f0f7ff, #e8f4f0);
+  border: 1px solid #c0d8e8;
+  border-radius: 14px;
+  padding: 28px 28px 24px;
+  margin-bottom: 24px;
+  animation: fadeup 0.5s ease both;
+}
+.feedback-highlight {
+  display: inline-block;
+  background: var(--accent);
+  color: white;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 12px;
+  border-radius: 20px;
+  letter-spacing: 0.08em;
+  margin-bottom: 14px;
+}
+.feedback-text {
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+.feedback-footer {
+  margin-top: 16px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="topbar-title">Learning Assessment</div>
+    <div class="topbar-sub">QUIZ PIPELINE</div>
+  </div>
+  <div class="topbar-sep"></div>
+  <div class="topbar-status" id="topStatus">Waiting</div>
+</div>
+
+<div class="container" id="app">
+  <!-- Waiting state -->
+  <div class="waiting-screen" id="waitingScreen">
+    <div class="waiting-anim">
+      <div class="ring"></div>
+      <div class="ring ring2"></div>
+    </div>
+    <div class="waiting-title">Preparing, please wait</div>
+    <div class="waiting-sub" id="waitMsg">
+      Your teacher is analyzing the course content. Questions will appear here automatically once ready.
+    </div>
+  </div>
+
+  <!-- Next-round waiting (between rounds) -->
+  <div id="nextRoundScreen" style="display:none">
+    <div class="next-round-waiting">
+      <div class="waiting-anim" style="margin:0 auto 16px"><div class="ring"></div><div class="ring ring2"></div></div>
+      <div class="round-badge" id="nextRoundBadge">Round 2</div>
+      <div class="next-round-title" id="nextRoundTitle">Generating the next round of questions</div>
+      <div class="next-round-sub" id="nextRoundSub">The AI is customizing new questions based on your answers, please wait...</div>
+    </div>
+  </div>
+
+  <!-- Quiz area (hidden initially) -->
+  <div id="quizArea" style="display:none"></div>
+
+  <!-- Result area (hidden initially) -->
+  <div id="resultArea" style="display:none"></div>
+</div>
+
+<script>
+const API = window.location.origin;
+
+// ── State ─────────────────────────────────────────────────
+let questionsPerRound = {};  // { roundNum: questions[] }
+let userAnswers       = {};  // { courseIdx: { qIdx: 'A' } }
+let submitted         = false;
+let currentCourse     = 0;
+let currentRound      = 1;
+let nextRoundReady    = null;  // round number that just became ready (null if none pending)
+let pendingNextRound  = false; // waiting for the next round to generate
+let lastDecision      = null;  // last agent decision object
+let es                = null;
+
+// Keep legacy aliases for backward compat
+Object.defineProperty(window, 'allQuestions',   { get: () => questionsPerRound[1] || [] });
+Object.defineProperty(window, 'allQuestionsR2', { get: () => questionsPerRound[2] || [] });
+
+// ── SSE connection ────────────────────────────────────────
+function connectSSE() {
+  if (es) es.close();
+  es = new EventSource(`${API}/stream/student`);
+
+  es.addEventListener('waiting', e => {
+    setWaitMsg(JSON.parse(e.data).message);
+    setStatus('live', 'Analyzing course');
+  });
+
+  // Round 1: questions first ready
+  es.addEventListener('questions_ready', e => {
+    const d = JSON.parse(e.data);
+    const qs = d.questions || [];
+    const rn = d.round || 1;
+    questionsPerRound[rn] = qs;
+    if (qs.length > 0) {
+      setStatus('quiz', 'Answering');
+      showQuiz(qs, rn);
+    }
+  });
+
+  // Round 2+: subsequent rounds ready
+  es.addEventListener('round_ready', e => {
+    const d = JSON.parse(e.data);
+    const qs = d.questions || [];
+    const rn = d.round;
+    questionsPerRound[rn] = qs;
+    nextRoundReady = rn;
+    pendingNextRound = false;
+
+    // If we're on the next-round waiting screen, jump straight in
+    if (document.getElementById('nextRoundScreen').style.display !== 'none') {
+      startRound(rn);
+      return;
+    }
+    // If we're on the result screen, unlock the button
+    _unlockNextRoundBtn(rn);
+  });
+
+  // Backend decided to continue; show waiting screen with score preview
+  es.addEventListener('next_round_coming', e => {
+    const d = JSON.parse(e.data);
+    pendingNextRound = true;
+    nextRoundReady   = null;
+    if (submitted) {
+      _showNextRoundWaiting(d.round);
+    }
+  });
+
+  // Practice rounds are over; teacher is reviewing the AI-drafted feedback before it's sent
+  es.addEventListener('waiting_feedback', e => {
+    const d = JSON.parse(e.data);
+    pendingNextRound = false;
+    _showFeedbackWaiting(d.message);
+  });
+
+  es.addEventListener('done', e => {
+    const d = JSON.parse(e.data);
+    setStatus('done', 'Done');
+    pendingNextRound = false;
+    const feedbackHtml = _buildFeedbackCard(d.message, d.highlight);
+    if (document.getElementById('nextRoundScreen').style.display !== 'none') {
+      // Student is on the inter-round waiting screen
+      _showAllDone(d.message, d.highlight);
+    } else if (document.getElementById('resultArea').style.display !== 'none') {
+      // Student is on the result page — insert feedback at top, hide next-round / waiting cards
+      const card = document.getElementById('nextRoundCard');
+      if (card) card.style.display = 'none';
+      const waitCard = document.getElementById('feedbackWaitCard');
+      if (waitCard) waitCard.remove();
+      document.getElementById('resultArea').insertAdjacentHTML('afterbegin', feedbackHtml);
+    }
+  });
+
+  es.addEventListener('error', e => {
+    try { setWaitMsg('Error: ' + JSON.parse(e.data).message); } catch(_) {}
+  });
+
+  es.onerror = () => setTimeout(connectSSE, 3000);
+}
+
+function _showNextRoundWaiting(roundNum) {
+  document.getElementById('waitingScreen').style.display  = 'none';
+  document.getElementById('quizArea').style.display       = 'none';
+  document.getElementById('resultArea').style.display     = 'none';
+  document.getElementById('nextRoundScreen').style.display = 'block';
+
+  document.getElementById('nextRoundBadge').textContent = `Round ${roundNum}`;
+  document.getElementById('nextRoundTitle').textContent = `Preparing round ${roundNum} practice questions for you`;
+  document.getElementById('nextRoundSub').textContent   = 'Just a moment, almost ready...';
+}
+
+function _showAllDone(message, highlight) {
+  document.getElementById('nextRoundScreen').style.display = 'none';
+  document.getElementById('resultArea').style.display      = 'block';
+  document.getElementById('resultArea').innerHTML = _buildFeedbackCard(message, highlight);
+}
+
+// Shown after the last round is finished, while the teacher reviews the AI feedback draft
+function _showFeedbackWaiting(message) {
+  const cardHtml = `
+    <div class="round2-notif" id="feedbackWaitCard">
+      <div class="spinner"></div>
+      <div class="round2-text">
+        <h3>Your teacher is finalizing your feedback</h3>
+        <p>${message || 'Please wait, feedback will appear here automatically once your teacher confirms it...'}</p>
+      </div>
+    </div>`;
+
+  if (document.getElementById('nextRoundScreen').style.display !== 'none') {
+    // Was on the inter-round waiting screen (shouldn't normally happen here, but handle gracefully)
+    document.getElementById('nextRoundScreen').style.display = 'none';
+    document.getElementById('resultArea').style.display      = 'block';
+    document.getElementById('resultArea').innerHTML = cardHtml;
+    return;
+  }
+  const resultArea = document.getElementById('resultArea');
+  if (resultArea.style.display !== 'none' && !document.getElementById('feedbackWaitCard')) {
+    // Insert just under the score banner (after nextRoundCardArea if present)
+    const anchor = document.getElementById('nextRoundCardArea');
+    if (anchor) anchor.insertAdjacentHTML('afterend', cardHtml);
+    else resultArea.insertAdjacentHTML('afterbegin', cardHtml);
+  }
+}
+
+function _buildFeedbackCard(feedbackText, highlight) {
+  return `
+    <div class="feedback-card">
+      ${highlight ? `<div class="feedback-highlight">✨ ${highlight}</div>` : ''}
+      <div class="feedback-text">${feedbackText || 'Thanks for participating!'}</div>
+      <div class="feedback-footer">This practice session is complete</div>
+    </div>`;
+}
+
+function _unlockNextRoundBtn(rn) {
+  const btn  = document.getElementById('btnNextRound');
+  const note = document.getElementById('nextRoundNote');
+  if (btn) {
+    btn.disabled    = false;
+    btn.textContent = `Start round ${rn} →`;
+    btn.onclick     = () => startRound(rn);
+  }
+  if (note) note.innerHTML = `Round ${rn} questions are ready! Click the button on the right to start.`;
+}
+
+// ── Check state on page load ──────────────────────────────
+async function checkInitialState() {
+  try {
+    const status = await fetch(`${API}/status`).then(r => r.json());
+    const r1 = await fetch(`${API}/questions`).then(r => r.json());
+    if (r1.ready && r1.questions.length > 0 && !submitted) {
+      questionsPerRound[1] = r1.questions;
+      setStatus('quiz', 'Answering');
+      showQuiz(r1.questions, 1);
+    }
+    // Check for any further rounds via /questions/current
+    const cur = await fetch(`${API}/questions/current`).then(r => r.json());
+    if (cur.ready && cur.round > 1 && !submitted) {
+      questionsPerRound[cur.round] = cur.questions;
+    }
+
+    // Restore feedback state on reload (e.g. page refreshed while teacher was reviewing)
+    const fb = await fetch(`${API}/feedback`).then(r => r.json());
+    if (fb.ready) {
+      setStatus('done', 'Done');
+      document.getElementById('waitingScreen').style.display   = 'none';
+      document.getElementById('quizArea').style.display        = 'none';
+      document.getElementById('nextRoundScreen').style.display = 'none';
+      document.getElementById('resultArea').style.display      = 'block';
+      document.getElementById('resultArea').innerHTML = _buildFeedbackCard(fb.feedback, fb.highlight);
+    } else if (status.feedback_status === 'pending') {
+      document.getElementById('waitingScreen').style.display   = 'none';
+      document.getElementById('quizArea').style.display        = 'none';
+      document.getElementById('nextRoundScreen').style.display = 'none';
+      document.getElementById('resultArea').style.display      = 'block';
+      document.getElementById('resultArea').innerHTML = '';
+      _showFeedbackWaiting('Your teacher is finalizing your feedback, please wait...');
+    }
+  } catch(_) {}
+}
+
+// ── Render quiz ───────────────────────────────────────────
+function showQuiz(questions, round) {
+  currentRound = round;
+  submitted    = false;
+  userAnswers  = {};
+  currentCourse = 0;
+  document.getElementById('waitingScreen').style.display   = 'none';
+  document.getElementById('nextRoundScreen').style.display = 'none';
+  document.getElementById('resultArea').style.display      = 'none';
+  document.getElementById('quizArea').style.display        = 'block';
+  renderQuiz();
+}
+
+function startRound(rn) {
+  const qs = questionsPerRound[rn];
+  if (!qs || !qs.length) return;
+  showQuiz(qs, rn);
+}
+
+function renderQuiz() {
+  const questions  = questionsPerRound[currentRound] || [];
+  const quizArea   = document.getElementById('quizArea');
+  const courseQ    = questions[currentCourse];
+  if (!courseQ) return;
+
+  const qs       = courseQ.generated_questions || [];
+  const total    = qs.length;
+  const answered = Object.keys(userAnswers[currentCourse] || {}).length;
+
+  let html = '';
+
+  // Course tabs if multiple
+  if (questions.length > 1) {
+    html += '<div class="course-tabs">';
+    questions.forEach((q, i) => {
+      html += `<button class="course-tab${i===currentCourse?' active':''}" onclick="switchCourse(${i})">${q.course_name||q.source_file}</button>`;
+    });
+    html += '</div>';
+  }
+
+  // Course header
+  html += `
+    <div class="course-header">
+      <div class="course-tag">Round ${currentRound} · ${currentCourse+1}/${questions.length}</div>
+      <div class="course-name">${courseQ.course_name || courseQ.source_file}</div>
+      <div class="course-meta">
+        <div class="course-meta-item">Questions <strong>${total}</strong></div>
+        <div class="course-meta-item">Answered <strong>${answered}</strong></div>
+      </div>
+    </div>
+  `;
+
+  // Progress
+  const pct = total ? Math.round(answered / total * 100) : 0;
+  html += `
+    <div class="progress-wrap">
+      <div class="progress-label">Progress</div>
+      <div class="progress-bar-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
+      <div class="progress-count">${answered}/${total}</div>
+    </div>
+  `;
+
+  // Questions
+  qs.forEach((q, qi) => {
+    html += renderQuestionCard(q, qi, (userAnswers[currentCourse] || {})[qi], false);
+  });
+
+  // Submit button
+  const allAnswered = answered === total;
+  html += `
+    <div class="submit-wrap">
+      <button class="btn-submit" id="btnSubmit"
+        onclick="submitAnswers()"
+        ${!allAnswered ? 'disabled' : ''}>
+        ${!allAnswered ? `${total-answered} question(s) remaining` : 'Submit answers →'}
+      </button>
+    </div>
+  `;
+
+  quizArea.innerHTML = html;
+}
+
+function renderQuestionCard(q, qi, userAns, isReview) {
+  const letters = ['A','B','C','D'];
+  const answered = userAns !== undefined;
+
+  let optsHtml = '';
+  (q.options || []).forEach((opt, oi) => {
+    const letter = letters[oi];
+    let cls = '';
+    if (isReview) {
+      if (letter === q.answer?.toUpperCase()) cls = 'reveal-correct';
+      if (letter === userAns) cls = userAns === q.answer?.toUpperCase() ? 'correct' : 'wrong';
+    } else {
+      if (letter === userAns) cls = 'selected';
+    }
+    const disabled = answered ? 'disabled' : '';
+    optsHtml += `
+      <button class="opt-btn ${cls}" ${disabled} onclick="selectAnswer(${qi}, '${letter}')">
+        <span class="opt-letter">${letter}</span>
+        <span>${opt.replace(/^[ABCD]\.\s*/,'')}</span>
+      </button>`;
+  });
+
+  const explHtml = (isReview && q.explanation)
+    ? `<div class="opt-expl show">💡 ${q.explanation}</div>`
+    : '';
+
+  return `
+    <div class="q-card" id="qcard-${qi}">
+      <div class="q-header">
+        <div class="q-num-badge ${answered?'answered':''}">${qi+1}</div>
+        <div class="q-tags">
+          <span class="q-tag">${q.bloom_level||''}</span>
+          <span class="q-tag">${q.difficulty||''}</span>
+        </div>
+      </div>
+      <div class="q-text">${q.question}</div>
+      <div class="options">${optsHtml}</div>
+      ${explHtml}
+    </div>`;
+}
+
+function selectAnswer(qi, letter) {
+  if (!userAnswers[currentCourse]) userAnswers[currentCourse] = {};
+  userAnswers[currentCourse][qi] = letter;
+  renderQuiz();
+}
+
+function switchCourse(idx) {
+  currentCourse = idx;
+  renderQuiz();
+}
+
+// ── Submit ────────────────────────────────────────────────
+async function submitAnswers() {
+  const questions  = questionsPerRound[currentRound] || [];
+  const perCourse  = [];
+
+  questions.forEach((courseQ, ci) => {
+    const qs        = courseQ.generated_questions || [];
+    const courseAns = userAnswers[ci] || {};
+    let score = 0;
+    const answers = qs.map((q, qi) => {
+      const userAns   = courseAns[qi] || '';
+      const correct   = q.answer?.toUpperCase() || '';
+      const isCorrect = userAns === correct;
+      if (isCorrect) score++;
+      return {
+        id:             q.id,
+        user_answer:    userAns,
+        correct_answer: correct,
+        is_correct:     isCorrect,
+        objective_ids:  q.objective_ids || [],
+        bloom_level:    q.bloom_level   || '',
+        difficulty:     q.difficulty    || '',
+      };
+    });
+    perCourse.push({ source_file: courseQ.source_file, course_name: courseQ.course_name, answers, score, total: qs.length });
+  });
+
+  const payload = { round: currentRound, per_course: perCourse };
+
+  try {
+    await fetch(`${API}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch(e) {
+    console.error('Submit failed', e);
+  }
+
+  submitted = true;
+  showResult(perCourse, questions);
+}
+
+// ── Result screen ─────────────────────────────────────────
+function showResult(perCourse, questions) {
+  document.getElementById('quizArea').style.display   = 'none';
+  document.getElementById('resultArea').style.display = 'block';
+  setStatus('done', `Round ${currentRound} complete`);
+
+  const total   = perCourse.reduce((a,c) => a + c.total, 0);
+  const correct = perCourse.reduce((a,c) => a + c.score, 0);
+  const pct     = total ? Math.round(correct/total*100) : 0;
+  const pass    = pct >= 60;
+
+  let html = `<div class="result-screen">`;
+
+  // Banner
+  html += `
+    <div class="result-banner ${pass?'pass':'fail'}">
+      <div class="result-score">${correct}<span style="font-size:28px;opacity:0.7">/${total}</span></div>
+      <div class="result-score-label">Round ${currentRound} correct answers</div>
+      <div class="result-msg">${pct}% correct — ${pass ? '🎉 Great job!' : 'Keep going, more practice will help!'}</div>
+    </div>
+  `;
+
+  // Next-round card — injected later by _pollDecision if agent decides to continue
+  html += `<div id="nextRoundCardArea"></div>`;
+
+  // Per-question review
+  questions.forEach((courseQ, ci) => {
+    const qs        = courseQ.generated_questions || [];
+    const courseAns = userAnswers[ci] || {};
+    html += `<div class="section-hd" style="font-family:var(--mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);border-bottom:1px solid var(--rule);padding-bottom:8px;margin-bottom:16px;margin-top:24px">${courseQ.course_name||courseQ.source_file} — Answer Details</div>`;
+    qs.forEach((q, qi) => {
+      html += renderQuestionCard(q, qi, courseAns[qi], true);
+    });
+  });
+
+  html += '</div>';
+  document.getElementById('resultArea').innerHTML = html;
+
+  // If a next round is already available, unlock immediately
+  if (nextRoundReady) {
+    _unlockNextRoundBtn(nextRoundReady);
+  }
+
+  _pollDecision();
+}
+
+// ── Poll /decisions for the latest agent decision ─────────
+let _decisionPollTimer = null;
+function _pollDecision() {
+  if (_decisionPollTimer) clearInterval(_decisionPollTimer);
+  _decisionPollTimer = setInterval(async () => {
+    try {
+      const data = await fetch(`${API}/decisions`).then(r => r.json());
+      const decisions = data.decisions || [];
+      const dec = decisions.find(d => d.round === currentRound);
+      if (dec && dec !== lastDecision) {
+        lastDecision = dec;
+        if (dec.continue) {
+          // Inject next-round card only now that we know there's a next round
+          const area = document.getElementById('nextRoundCardArea');
+          if (area && !document.getElementById('nextRoundCard')) {
+            area.innerHTML = `
+              <div class="round2-notif" id="nextRoundCard">
+                <div class="round2-icon">🎯</div>
+                <div class="round2-text">
+                  <h3>Next round of practice</h3>
+                  <p id="nextRoundNote"><span class="spinner"></span> Generating the next round of questions...</p>
+                </div>
+                <button class="btn-round2" id="btnNextRound" disabled>Waiting...</button>
+              </div>`;
+          }
+          if (nextRoundReady) _unlockNextRoundBtn(nextRoundReady);
+        } else {
+          // Agent decided to stop — feedback arrives via SSE done
+          const area = document.getElementById('nextRoundCardArea');
+          if (area) area.style.display = 'none';
+          clearInterval(_decisionPollTimer);
+        }
+      }
+      // Check if next round questions are ready
+      if (!nextRoundReady) {
+        const cur = await fetch(`${API}/questions/current`).then(r => r.json());
+        if (cur.ready && cur.round > currentRound) {
+          questionsPerRound[cur.round] = cur.questions;
+          nextRoundReady = cur.round;
+          _unlockNextRoundBtn(cur.round);
+          clearInterval(_decisionPollTimer);
+        }
+      }
+    } catch(_) {}
+  }, 3000);
+}
+
+// ── UI helpers ────────────────────────────────────────────
+function setStatus(cls, text) {
+  const el = document.getElementById('topStatus');
+  el.className = 'topbar-status ' + cls;
+  el.textContent = text;
+}
+
+function setWaitMsg(msg) {
+  document.getElementById('waitMsg').textContent = msg;
+}
+
+// ── Init ──────────────────────────────────────────────────
+connectSSE();
+checkInitialState();
+</script>
+</body>
+</html>
